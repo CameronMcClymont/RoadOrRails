@@ -37,9 +37,12 @@ class _HomeState extends State<Home> {
   double loadingProgress = 0;
   String loadingMessage = '';
 
-  bool isReturnJourney = false;
-  int numAdults = 0;
+  int numAdults = 1;
   int numKids = 0;
+  bool isReturnJourney = false;
+  List<String> railcards = ['None'];
+  String railcard = 'None';
+  int numRailcards = 1;
 
   int fuelType = 0; // 0 = petrol, 1 = diesel, 2 = electric
   List<double> fuelPrices = [0, 0, 0]; // pence (petrol), pence (diesel), pence (electric)
@@ -58,8 +61,9 @@ class _HomeState extends State<Home> {
   int numChanges = 0;
   static const double walkingSpeed = 3; // miles per hour
 
-  Future setFuelPrices() async {
-    final response = await http.get(Uri.parse('https://www.arval.co.uk/about-arval/insights/average-uk-fuel-prices'));
+  Future setFuelPricesAndRailcards() async {
+    // Fetch fuel prices
+    http.Response response = await http.get(Uri.parse('https://www.arval.co.uk/about-arval/insights/average-uk-fuel-prices'));
 
     if (response.statusCode == 200) {
       var document = parser.parse(response.body);
@@ -78,6 +82,23 @@ class _HomeState extends State<Home> {
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't fetch latest fuel price.")));
+    }
+
+    // Fetch railcards
+    response = await http.get(Uri.parse('https://traintimes.org.uk'));
+
+    if (response.statusCode == 200) {
+      var document = parser.parse(response.body);
+      try {
+        var dropdown = document.getElementById('railcard')!.children.sublist(1); // Skip 'None' value
+        setState(() {
+          railcards.addAll(dropdown.map((e) => e.text));
+        });
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't fetch railcards.")));
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't fetch railcards.")));
     }
   }
 
@@ -194,6 +215,10 @@ class _HomeState extends State<Home> {
 
   Future<bool> setTrainPriceAndTime() async {
     String url = 'https://traintimes.org.uk/$originStation/$destStation/first/tomorrow/last/tomorrow?adults=$numAdults&kids=$numKids';
+    if (railcard != 'None') {
+      url += '&railcard=${railcard.substring(railcard.indexOf('(') + 1, railcard.indexOf(')'))}&railcardN=$numRailcards';
+    }
+
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
       var document = parser.parse(response.body);
@@ -268,7 +293,7 @@ class _HomeState extends State<Home> {
 
     WidgetsBinding.instance!.addPostFrameCallback((_) {
       setSharedPrefs();
-      setFuelPrices();
+      setFuelPricesAndRailcards();
     });
   }
 
@@ -299,7 +324,7 @@ class _HomeState extends State<Home> {
               children: [
                 PostcodeField(controller: originController, label: 'Origin postcode'),
                 PostcodeField(controller: destController, label: 'Destination postcode'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Row(
@@ -377,7 +402,58 @@ class _HomeState extends State<Home> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const Divider(thickness: 1),
+                Row(
+                  children: [
+                    const Text('Railcard:'),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButton(
+                        isExpanded: true,
+                        value: railcard,
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            railcard = newValue!;
+                          });
+                        },
+                        items: railcards.map(
+                          (railcard) => DropdownMenuItem(
+                            child: Text(railcard),
+                            value: railcard,
+                          ),
+                        ).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+                Visibility(
+                  visible: railcard != 'None',
+                  child: Row(
+                    children: [
+                      const Text('Quantity:'),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          if (numRailcards > 1) {
+                            setState(() {
+                              numRailcards -= 1;
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.remove),
+                      ),
+                      Text(numRailcards.toString()),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            numRailcards += 1;
+                          });
+                        },
+                        icon: const Icon(Icons.add),
+                      ),
+                    ],
+                  ),
+                ),
                 const Divider(thickness: 1),
                 Row(
                   children: [
@@ -481,30 +557,26 @@ class _HomeState extends State<Home> {
                   child: const Text('Calculate'),
                   onPressed: () async {
                     if (_formKey.currentState!.validate()) {
-                      if (numAdults > 0 || numKids > 0) {
-                        String originPostcode = originController.text.replaceAll(' ', '');
-                        String destPostcode = destController.text.replaceAll(' ', '');
-
-                        setState(() {
-                          loadingProgress = 0.1;
-                          loadingMessage = 'Fetching train times...';
-                        });
-
-                        bool wasSuccessful = await setTrainPriceAndTime();
-                        if (!wasSuccessful) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't fetch train prices/times.")));
+                      if (numAdults == 0 && numKids == 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please add some passengers!")));
+                      } else {
+                        if (numRailcards > numAdults + numKids) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("There can't be more railcards than passengers!")));
                         } else {
+                          String originPostcode = originController.text.replaceAll(' ', '');
+                          String destPostcode = destController.text.replaceAll(' ', '');
+
                           setState(() {
-                            loadingProgress = 0.35;
+                            loadingProgress = 0.1;
                             loadingMessage = 'Finding origin station...';
                           });
 
-                          wasSuccessful = await setNearestStation(originPostcode, true);
+                          bool wasSuccessful = await setNearestStation(originPostcode, true);
                           if (!wasSuccessful) {
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to find nearest origin train station.")));
                           } else {
                             setState(() {
-                              loadingProgress = 0.55;
+                              loadingProgress = 0.35;
                               loadingMessage = 'Finding destination station...';
                             });
 
@@ -513,56 +585,65 @@ class _HomeState extends State<Home> {
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to find nearest destination train station.")));
                             } else {
                               setState(() {
-                                loadingProgress = 0.99;
-                                loadingMessage = 'Calculating driving time...';
+                                loadingProgress = 0.55;
+                                loadingMessage = 'Fetching train times...';
                               });
 
-                              if (originStation.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Origin station was empty.")));
-                                return;
-                              }
-
-                              if (destStation.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Origin station was empty.")));
-                                return;
-                              }
-
-                              wasSuccessful = await setDrivingDistTime(originPostcode, destPostcode);
+                              wasSuccessful = await setTrainPriceAndTime();
                               if (!wasSuccessful) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't calculate route. Please make sure both postcodes are correct.")));
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't fetch train prices/times.")));
+
                               } else {
-                                double costToDrive = calcCostToDrive();
-                                if (costToDrive == -1) {
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't calculate cost to drive.")));
+                                setState(() {
+                                  loadingProgress = 0.99;
+                                  loadingMessage = 'Calculating driving time...';
+                                });
+
+                                if (originStation.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Origin station was empty.")));
                                   return;
                                 }
 
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => Results(
-                                      costToDrive: costToDrive,
-                                      timeToDrive: timeToDrive,
-                                      originPostcode: originController.text,
-                                      destPostcode: destController.text,
-                                      drivingDistance: drivingDistance,
-                                      costToTrain: costToTrain,
-                                      timeToOriginStation: timeToOriginStation,
-                                      timeOnTrain: timeOnTrain,
-                                      timeToDestStation: timeToDestStation,
-                                      originStation: originStation,
-                                      destStation: destStation,
-                                      distToOriginStation: distToOriginStation,
-                                      distToDestStation: distToDestStation,
-                                      numChanges: numChanges,
+                                if (destStation.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Origin station was empty.")));
+                                  return;
+                                }
+
+                                wasSuccessful = await setDrivingDistTime(originPostcode, destPostcode);
+                                if (!wasSuccessful) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't calculate route. Please make sure both postcodes are correct.")));
+                                } else {
+                                  double costToDrive = calcCostToDrive();
+                                  if (costToDrive == -1) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't calculate cost to drive.")));
+                                    return;
+                                  }
+
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => Results(
+                                        costToDrive: costToDrive,
+                                        timeToDrive: timeToDrive,
+                                        originPostcode: originController.text,
+                                        destPostcode: destController.text,
+                                        drivingDistance: drivingDistance,
+                                        costToTrain: costToTrain,
+                                        timeToOriginStation: timeToOriginStation,
+                                        timeOnTrain: timeOnTrain,
+                                        timeToDestStation: timeToDestStation,
+                                        originStation: originStation,
+                                        destStation: destStation,
+                                        distToOriginStation: distToOriginStation,
+                                        distToDestStation: distToDestStation,
+                                        numChanges: numChanges,
+                                      ),
                                     ),
-                                  ),
-                                );
+                                  );
+                                }
                               }
                             }
                           }
                         }
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please add some passengers!")));
                       }
                     }
 
