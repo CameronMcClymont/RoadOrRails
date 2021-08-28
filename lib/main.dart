@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:scotrail_sabotage/home.dart';
-import 'package:scotrail_sabotage/settings.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:road_or_rails/home.dart';
 
 void main() {
   runApp(const App());
@@ -20,11 +18,11 @@ class App extends StatelessWidget {
           return MaterialApp(
             title: 'Road or Rails?',
             theme: ThemeData(
-              primarySwatch: Colors.red,
+              primarySwatch: model.primaryColor,
               brightness: Brightness.light,
             ),
             darkTheme: ThemeData(
-              primarySwatch: Colors.red,
+              primarySwatch: model.primaryColor,
               brightness: Brightness.dark,
             ),
             themeMode: model.mode,
@@ -39,12 +37,18 @@ class App extends StatelessWidget {
 }
 
 class ThemeModel with ChangeNotifier {
+  MaterialColor primaryColor;
   ThemeMode mode;
 
-  ThemeModel({ThemeMode mode = ThemeMode.light}) : mode = mode;
+  ThemeModel({this.primaryColor = Colors.red, this.mode = ThemeMode.light});
 
   void toggleMode() {
     mode = mode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    notifyListeners();
+  }
+
+  void setPrimaryColor(MaterialColor newColor) {
+    primaryColor = newColor;
     notifyListeners();
   }
 }

@@ -7,9 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:geocoder/geocoder.dart';
 import 'package:html/parser.dart' as parser;
 import 'package:http/http.dart' as http;
-import 'package:scotrail_sabotage/results.dart';
-import 'package:scotrail_sabotage/settings.dart';
-import 'package:scotrail_sabotage/widgets.dart';
+import 'package:road_or_rails/results.dart';
+import 'package:road_or_rails/settings.dart';
+import 'package:road_or_rails/utils/color.dart';
+import 'package:road_or_rails/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'main.dart';
@@ -164,11 +165,12 @@ class _HomeState extends State<Home> {
 
     setState(() {
       drivingDistance = result['distance']['value'] / 1609;
+      timeToDrive = result['duration']['value'];
+
       if (isReturnJourney) {
         drivingDistance *= 2;
+        timeToDrive *= 2;
       }
-
-      timeToDrive = result['duration']['value'];
     });
 
     return true;
@@ -176,8 +178,14 @@ class _HomeState extends State<Home> {
 
   /// Finds the nearest train station to `postcode` and sets the origin station or
   /// destination station according to `isOrigin`.
-  Future<bool> setNearestStation(String postcode, bool isOrigin) async {
-    final response = await http.get(Uri.parse('https://traintimes.org.uk/$postcode/glc/first/tomorrow/last/tomorrow'));
+  Future<bool> setNearestStation(String postcode, bool isOrigin, {bool searchTomorrow = false}) async {
+    // Set which day we should search for trains on
+    String day = 'today';
+    if (searchTomorrow) {
+      day = 'tomorrow';
+    }
+
+    final response = await http.get(Uri.parse('https://traintimes.org.uk/$postcode/glc/11:00/$day/13:00/$day'));
     if (response.statusCode == 200) {
       var document = parser.parse(response.body);
       try {
@@ -207,14 +215,21 @@ class _HomeState extends State<Home> {
         return false;
       }
     } else {
+      await setNearestStation(postcode, isOrigin, searchTomorrow: true);
       return false;
     }
 
     return true;
   }
 
-  Future<bool> setTrainPriceAndTime() async {
-    String url = 'https://traintimes.org.uk/$originStation/$destStation/first/tomorrow/last/tomorrow?adults=$numAdults&kids=$numKids';
+  Future<bool> setTrainPriceAndTime({bool searchTomorrow = false}) async {
+    // Set which day we should search for trains on
+    String day = 'today';
+    if (searchTomorrow) {
+      day = 'tomorrow';
+    }
+
+    String url = 'https://traintimes.org.uk/$originStation/$destStation/11:00/$day/13:00/$day?adults=$numAdults&kids=$numKids';
     if (railcard != 'None') {
       url += '&railcard=${railcard.substring(railcard.indexOf('(') + 1, railcard.indexOf(')'))}&railcardN=$numRailcards';
     }
@@ -266,7 +281,7 @@ class _HomeState extends State<Home> {
         return false;
       }
     } else {
-      return false;
+      return await setTrainPriceAndTime(searchTomorrow: true);
     }
 
     return true;
@@ -274,16 +289,18 @@ class _HomeState extends State<Home> {
 
   setSharedPrefs() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(Settings.toggleDarkModeKey) ?? false) {
+      setState(() {
+        widget.themeModel.mode = ThemeMode.dark;
+      });
+    } else {
+      setState(() {
+        widget.themeModel.mode = ThemeMode.light;
+      });
+    }
+
     setState(() {
-      if (prefs.getBool(Settings.toggleDarkModeKey) ?? false) {
-        setState(() {
-          widget.themeModel.mode = ThemeMode.dark;
-        });
-      } else {
-        setState(() {
-          widget.themeModel.mode = ThemeMode.light;
-        });
-      }
+      widget.themeModel.setPrimaryColor(generateMaterialColor(Color(prefs.getInt(Settings.accentColorKey) ?? Colors.red.value)));
     });
   }
 

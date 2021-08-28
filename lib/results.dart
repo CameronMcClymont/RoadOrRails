@@ -102,7 +102,7 @@ class Results extends StatelessWidget {
     return TimelineTile(
       alignment: TimelineAlign.manual,
       lineXY: isLeft ? 0.2 : 0.8,
-      indicatorStyle: IndicatorStyle(width: 20, color: visibleDot ? Theme.of(context).primaryColor : Colors.transparent),
+      indicatorStyle: IndicatorStyle(width: 20, color: visibleDot ? Theme.of(context).colorScheme.primary : Colors.transparent),
       beforeLineStyle: const LineStyle(color: Colors.black54, thickness: 3),
       afterLineStyle: const LineStyle(color: Colors.black54, thickness: 3),
       isFirst: isFirst,
@@ -116,8 +116,19 @@ class Results extends StatelessWidget {
   Widget build(BuildContext context) {
     int totalTimeToTrain = timeToOriginStation + timeOnTrain + timeToDestStation;
 
-    double costDifference = 100 * costToTrain / costToDrive;
-    double timeDifference = 100 * totalTimeToTrain.roundToDouble() / timeToDrive.roundToDouble();
+    double costDifference;
+    if (costToTrain > costToDrive) {
+      costDifference = 100 * costToTrain / costToDrive;
+    } else {
+      costDifference = -(100 * costToDrive / costToTrain);
+    }
+
+    double timeDifference;
+    if (totalTimeToTrain > timeToDrive) {
+      timeDifference = 100 * totalTimeToTrain.roundToDouble() / timeToDrive.roundToDouble();
+    } else {
+      timeDifference = -(100 * timeToDrive.roundToDouble() / totalTimeToTrain.roundToDouble());
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -149,11 +160,11 @@ class Results extends StatelessWidget {
                       Column(
                         children: [
                           Text(
-                            (costDifference > 0 ? '+' : (costDifference < 0 ? '-' : '=')) + '${costDifference.round()}%',
+                            (costDifference > 0 ? '+' : (costDifference < 0 ? '' : '=')) + '${costDifference.round()}%',
                             style: TextStyle(color: costDifference > 0 ? Colors.red : (costDifference < 0 ? Colors.green : Colors.black), fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            (timeDifference > 0 ? '+' : (timeDifference < 0 ? '-' : '=')) + '${timeDifference.round()}%',
+                            (timeDifference > 0 ? '+' : (timeDifference < 0 ? '' : '=')) + '${timeDifference.round()}%',
                             style: TextStyle(color: timeDifference > 0 ? Colors.red : (timeDifference < 0 ? Colors.green : Colors.black), fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -180,7 +191,7 @@ class Results extends StatelessWidget {
                   Expanded(
                     child: Column(
                       children: [
-                        timelineTile(context, true, 'G613BD', isFirst: true),
+                        timelineTile(context, true, originPostcode, isFirst: true),
                         timelineTile(
                           context,
                           true,
@@ -191,7 +202,7 @@ class Results extends StatelessWidget {
                           visibleDot: false,
                         ),
                         timelineTile(context, true, '', visibleDot: false),
-                        timelineTile(context, true, 'G613BD', isLast: true),
+                        timelineTile(context, true, destPostcode, isLast: true),
                       ],
                     ),
                   ),
@@ -201,7 +212,7 @@ class Results extends StatelessWidget {
                         timelineTile(
                           context,
                           false,
-                          'G613BD',
+                          originPostcode,
                           cardTopText: formatDuration(Duration(seconds: timeToOriginStation)),
                           cardBottomText: '$distToOriginStation miles',
                           icon: const Icon(Icons.directions_walk),
@@ -210,7 +221,7 @@ class Results extends StatelessWidget {
                         timelineTile(
                           context,
                           false,
-                          'Hillfoot',
+                          originStation,
                           cardTopText: formatDuration(Duration(seconds: timeOnTrain)),
                           cardBottomText: numChanges == 0 ? 'Direct' : '$numChanges change(s)',
                           icon: const Icon(Icons.train),
@@ -218,12 +229,12 @@ class Results extends StatelessWidget {
                         timelineTile(
                           context,
                           false,
-                          'Jordanhill',
+                          destStation,
                           cardTopText: formatDuration(Duration(seconds: timeToDestStation)),
                           cardBottomText: '$distToDestStation miles',
                           icon: const Icon(Icons.directions_walk),
                         ),
-                        timelineTile(context, false, 'G613BD', isLast: true),
+                        timelineTile(context, false, destPostcode, isLast: true),
                       ],
                     ),
                   ),
