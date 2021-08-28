@@ -100,7 +100,7 @@ class _ColorSettingState extends State<ColorSetting> {
   @override
   void initState() {
     super.initState();
-    int colorValue = widget.prefs.getInt(Settings.accentColorKey) ?? Theme.of(context).colorScheme.primary.value;
+    int colorValue = widget.prefs.getInt(Settings.accentColorKey) ?? Colors.red.value;
     pickerColor = generateMaterialColor(Color(colorValue));
   }
 
