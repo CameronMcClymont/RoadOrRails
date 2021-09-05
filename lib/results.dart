@@ -118,16 +118,16 @@ class Results extends StatelessWidget {
 
     double costDifference;
     if (costToTrain > costToDrive) {
-      costDifference = 100 * costToTrain / costToDrive;
+      costDifference = 100 * costToTrain / costToDrive - 100;
     } else {
-      costDifference = -(100 * costToDrive / costToTrain);
+      costDifference = -(100 * costToDrive / costToTrain) + 100;
     }
 
     double timeDifference;
     if (totalTimeToTrain > timeToDrive) {
-      timeDifference = 100 * totalTimeToTrain.roundToDouble() / timeToDrive.roundToDouble();
+      timeDifference = 100 * totalTimeToTrain.roundToDouble() / timeToDrive.roundToDouble() - 100;
     } else {
-      timeDifference = -(100 * timeToDrive.roundToDouble() / totalTimeToTrain.roundToDouble());
+      timeDifference = -(100 * timeToDrive.roundToDouble() / totalTimeToTrain.roundToDouble()) + 100;
     }
 
     return Scaffold(
