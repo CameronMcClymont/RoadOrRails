@@ -31,11 +31,11 @@ class PostcodeField extends StatelessWidget {
           }
 
           String postcode = value.replaceAll(' ', '');
-          if (postcode.length >= 5 && postcode.length <= 6) {
+          if (postcode.length >= 5 && postcode.length <= 7) {
             return null;
           }
 
-          return 'Postcode must be 5-6 characters.';
+          return 'Postcode must be 5-7 characters.';
         }
       },
     );
